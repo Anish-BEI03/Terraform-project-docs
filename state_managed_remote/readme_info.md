@@ -51,6 +51,15 @@ Real Infrastructure
 - **No Versioning**: The local state file is not versioned, making it difficult to track changes over time.
 - **No State Locking**: The local state file is not locked, making it possible for multiple users to modify the same infrastructure at the same time, which can lead to conflicts and data corruption.
 
+## What is Backend?
+
+Backend is a storage mechanism that is used to store the state file.
+
+There are two types of backends:
+
+- Local backend
+- Remote backend
+
 ## Local State
 
 it is default state management method in terraform where state file is stored in local machine
@@ -181,6 +190,20 @@ terraform refresh
 
 terraform plan -refresh-only # update its state to reflect changes in cloud but not change the cloud resources.
 
+```
+
+## State Security
+
+For state security, it is recommended to use backend configuration with state locking and encryption.
+
+S3 state bucket should have appropriate security controls such as:
+
+```
+S3 Bucket
+├── Block public access
+├── Encryption
+├── IAM permissions
+└── Versioning
 ```
 
 ## Best Practices
@@ -389,3 +412,30 @@ terraform state pull > temp.tfstate
 | `terraform state mv -no-backup`      | Prevents backup of the state file during move operation            | `terraform state mv -no-backup`      |
 | `terraform state push`               | Pushes the local state file to the remote backend                  | `terraform state push`               |
 | `terraform state pull`               | Pulls the remote state file to the local backend                   | `terraform state pull`               |
+
+# Production Architecture
+
+```bash
+                 Git Repository
+                       │
+                       ↓
+                 Terraform Code
+                       │
+                       ↓
+                  CI/CD Pipeline
+                       │
+                       ↓
+                    Terraform
+                       │
+                       ↓
+              ┌─────────────────┐
+              │   Amazon S3     │
+              │                 │
+              │ terraform.tfstate
+              │      +          │
+              │    lockfile     │
+              └─────────────────┘
+                       │
+                       ↓
+                AWS Infrastructure
+```
