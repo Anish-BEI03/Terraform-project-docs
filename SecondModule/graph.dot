@@ -1,0 +1,11 @@
+digraph G {
+  rankdir = "RL";
+  node [shape = rect, fontname = "sans-serif"];
+  "local_file.My_file" [label="local_file.My_file"];
+  "local_file.devops" [label="local_file.devops"];
+  "local_file.first" [label="local_file.first"];
+  "local_file.second" [label="local_file.second"];
+  "local_file.third" [label="local_file.third"];
+  "local_file.second" -> "local_file.first";
+  "local_file.third" -> "local_file.second";
+}

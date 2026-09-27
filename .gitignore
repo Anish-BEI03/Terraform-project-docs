@@ -1,0 +1,26 @@
+# Terraform compiled / cached providers and modules
+**/.terraform/
+.terraform/
+**/terraform-provider-*
+terraform-provider-*
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfstate.backup
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Sensitive keys and credentials
+**/*.pem
+**/*.key
+**/terra-key-ec2
+**/terra-ec2-key
+!**/*.pub
+
+# OS specific files
+.DS_Store
+Thumbs.db

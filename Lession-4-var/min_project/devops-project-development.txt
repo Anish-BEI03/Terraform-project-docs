@@ -1,0 +1,3 @@
+Project: devops-project
+Environment: development
+Managed by Terraform

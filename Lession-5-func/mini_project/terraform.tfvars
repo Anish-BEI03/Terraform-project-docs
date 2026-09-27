@@ -1,0 +1,5 @@
+servers = [
+  "web",
+  "api",
+  "database"
+]

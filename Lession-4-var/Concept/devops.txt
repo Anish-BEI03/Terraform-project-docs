@@ -1,0 +1,4 @@
+Environment: development
+env : prod
+password: anish123
+app_name : myapp-development-prod
