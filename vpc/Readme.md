@@ -2,6 +2,10 @@
 
 vpc ->subnet->route table -> internet gateway -> internet
 
+# vpc list using aws cli
+
+comm -23 <(aws ec2 describe-vpcs --region us-east-1 --query "Vpcs[].VpcId" --output text | tr '\t' '\n' | sort) <(aws ec2 describe-instances --region us-east-1 --query "Reservations[].Instances[].VpcId" --output text | tr '\t' '\n' | sort -u)
+
 # Create AWS VPC with CIDR block 10.0.0.0/16
 
 ```
@@ -110,7 +114,7 @@ create private route table for private subnet
 resource "aws_route_table" "my-public-route-table" {
   vpc_id = aws_vpc.my-vpc-1.id
   route {
-    cidr_block = "[0.0.0.0/0]"
+    cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.my-internet-gateway.id
   }
   tags = {
@@ -153,7 +157,7 @@ Private Subnet
 ```
 
 ```bash
-resouce "aws_route_table_association" "my-public-route-table-association" {
+resource "aws_route_table_association" "my-public-route-table-association" {
   route_table_id = aws_route_table.my-public-route-table.id
   subnet_id      = aws_subnet.my-public-subnet-1.id
 }
