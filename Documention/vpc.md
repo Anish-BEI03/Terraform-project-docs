@@ -5,14 +5,15 @@ cloude networking is is a set of netwoking services that are used to create and 
 ## core competencies:
 
 1.  vpc
-2.  subnets
-3.  security groups
-4.  route tables
-5.  internet gateway
-6.  nat gateway
-7.  load balancer
-8.  vpn gateway
-9.  direct connect
+2.  cid and ip addressing
+3.  subnets
+4.  security groups
+5.  route tables
+6.  internet gateway
+7.  nat gateway
+8.  load balancer
+9.  vpn gateway
+10. direct connect
 
 ## Advantages of Cloud Networking:
 
@@ -91,6 +92,22 @@ world divided -> us, asia , europe
 | | | | |** security group
 | | | | |** network acl
 
+```
+
+# key point to remember for terraform vpc
+
+VPC
+ ↓
+Subnets
+ ↓
+Route Tables
+ ↓
+Internet Gateway / NAT Gateway
+ ↓
+Network connectivity
+
+```
+
 # AWS: Region -> Availability Zone -> VPC -> Subnet -> Route Table -> Public Subnet -> Private Subnet -> NAT Gateway -> Security Group -> Network ACL
 
 We move into Aws networking, one of the most important topic in cloud computing for desing and deploy the applications using terraform.
@@ -113,13 +130,13 @@ https://docs.aws.amazon.com/vpc/latest/userguide/aws-vpc-design-reference.html
 ```
    www.google.com
           |
-       Route 53
+       Route 53 -> DNS Resolve
           |
-       Internet
+       Internet -> physical server or network of servers connected to the globe
           |
-    Internet Gateway
+    Internet Gateway -> AWS manage the IGW and provide the connection to the internet in AWS managed way for compute load or heavy traffic
           |
-        VPC
+        VPC -> logical isolation of private network inside the region (cidr block)
       /    \
      /      \
   subnet-A    subnet-B
@@ -157,15 +174,63 @@ AWS
 
 ```
 
+**VPC Architecture:**
+
+```
+                    Internet
+                       │
+                       ▼
+                Internet Gateway
+                       │
+              ┌────────┴────────┐
+              │                 │
+        Public Subnet      Public Subnet
+        AZ: 1a              AZ: 1b
+              │                 │
+          NAT Gateway       NAT Gateway
+              │                 │
+              ▼                 ▼
+        Private Subnet     Private Subnet
+        AZ: 1a              AZ: 1b
+              │                 │
+            EC2/EKS          EC2/EKS
+              │                 │
+              └────────┬────────┘
+                       │
+                    Database
+```
+
 When we create a vpc we need to provide the cidr block that define the IP address range for entire vpc. for example .
 
 vpc cidr block - 10.0.0.0/16
+
+```bash
+resource "aws_vpc" "main" {
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+
+  tags = {
+    Name = "my-vpc"
+  }
+}
+
+```
 
 ## CIDR (Classless Inter-Domain Routing)
 
 CIDR is a method for allowing ip addresses and routing ip packets inside the networks.
 
 cidr is a range of IP addresses that are used to create a network or range of a network inside vpc.
+
+**cidr example:**
+
+```
+10.0.0.0/16
+│        │
+│        └── 16 network bits
+└─────────── Network address
+```
 
 link https://cidr.xyz/
 
@@ -179,9 +244,80 @@ A subnet is a range of IP addresses that are used to create a network or range o
 
 https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Subnets.html
 
+```
+VPC
+10.0.0.0/16
+│
+├── Public-A
+│   10.0.1.0/24
+│
+├── Public-B
+│   10.0.2.0/24
+│
+├── Private-A
+│   10.0.11.0/24
+│
+└── Private-B
+    10.0.12.0/24
+
+```
+
+```bash
+# create public subnet at az1a
+resource "aws_subnet" "public_a" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.1.0/24"
+  availability_zone = "ap-south-1a"
+
+  tags = {
+    Name = "public-a"
+  }
+}
+
+# create public subnet at az1b
+resource "aws_subnet" "public_b" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.2.0/24"
+  availability_zone = "ap-south-1b"
+
+  tags = {
+    Name = "public-b"
+  }
+}
+
+# create private subnet at az1a
+resource "aws_subnet" "private_a" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.3.0/24"
+  availability_zone = "ap-south-1a"
+
+  tags = {
+    Name = "private-a"
+  }
+}
+
+# create private subnet at az1b
+resource "aws_subnet" "private_b" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.4.0/24"
+  availability_zone = "ap-south-1b"
+
+  tags = {
+    Name = "private-b"
+  }
+}
+```
+
 ### Public Subnet
 
 Public subnet is a subnet that is connected to the internet gateway. access to internet (inbound and outbound).
+
+```bash
+resource "aws_subnet" "public" {
+  vpc_id     = aws_vpc.main.id
+  cidr_block = "10.0.1.0/24"
+}
+```
 
 ### Private Subnet
 
@@ -213,11 +349,63 @@ VPC -> large network that can hold multiple subnets (range of ip address)
 
 ![alt text](image.png)
 
+```bash
+# Private subnet example (private subnet do not have access to internet gateway)
+resource "aws_subnet" "private" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.11.0/24"
+  availability_zone = "ap-south-1a"
+
+  tags = {
+    Name = "private-subnet"
+  }
+}
+```
+
+**_if its routes to internet directly it is public subnet otherwise private subnet_**
+
+**_If its route table only contains:_**
+
+```
+10.0.0.0/16 - local
+```
+
+then the subnet is **Private Subnet**
+
+**_there is no direct Internet route in private subnet_**
+
+**_Example of private subnet route table:_**
+
+```
+Destination        Target
+--------------------------------
+10.0.0.0/16        local
+```
+
+**_If route have igw then it is public subnet_**
+
 ## Route Table
 
 A route table is a set of rules that are used to route traffic between subnets.
 
 used to determine where network traffic from our subnet or gateways is directed . Each subnet in our vpc must be associated with a route table, which controls routeing rules for that subnet.
+
+```bash
+#For Example
+Destination        Target
+--------------------------------
+10.0.0.0/16        local
+0.0.0.0/0          Internet Gateway
+
+# Meaning
+10.0.0.0/16
+    ↓
+Stay inside VPC
+
+0.0.0.0/0 # extremely important to remember this for interviews
+    ↓
+Send toward Internet Gateway
+```
 
 https://docs.aws.amazon.com/vpc/latest/userguide/VPC_RouteTables.html
 
@@ -239,11 +427,77 @@ internet                           internet
     load balancer (NLB,ALB)
 ```
 
+```bash
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.main.id
+  }
+
+  tags = {
+    Name = "public-route-table"
+  }
+}
+```
+
+### Associate Route Table
+
+An association is a connection between a route table and a subnet. It tells the subnet which route table to use for routing traffic.
+
+we need to associate route table to subnet (in terraform)
+
+```
+VPC
+│
+├── Internet Gateway
+│
+├── Route Table
+│      │
+│      └── 0.0.0.0/0 → IGW
+│
+└── Public Subnet
+       │
+       └── Route Table Association
+```
+
+```bash
+
+#For Public Subnet
+resource "aws_route_table_association" "public" {
+  subnet_id      = aws_subnet.public.id
+  route_table_id = aws_route_table.public.id
+}
+
+#For Private Subnet
+resource "aws_route_table_association" "private" {
+  subnet_id      = aws_subnet.private.id
+  route_table_id = aws_route_table.private.id
+}
+```
+
 ## Internet Gateway
 
 Internet Gateway (IGW) is a horizontally scaled, redundant, and highly available VPC component that allows communication between resources in our VPC and the internet. It is a regional resource that can be attached to only one VPC at a time, but you can attach up to five IGWs to a VPC. It enables inbound and outbound internet access for resources in our VPC that are in public subnets.
 
+```
+VPC
+ │
+ └── Internet Gateway
+```
+
 An internet Gateway is a component of aws that is used to connect between instance in our vpc to the internet . we use it in public subnet only
+
+```bash
+resource "aws_internet_gateway" "main" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "main-igw"
+  }
+}
+```
 
 https://docs.aws.amazon.com/vpc/latest/userguide/vpc-igw-igw.html
 
@@ -528,3 +782,352 @@ https://docs.aws.amazon.com/vpn/latest/s2svpn/what-is-site-to-site-vpn.html
 AWS Web Application Firewall (WAF) is a web application firewall that allows we to protect our web applications from common web exploits.
 
 https://docs.aws.amazon.com/waf/latest/developerguide/what-is-waf.html
+
+# WHY Different Availability Zones?
+
+AWS distributes Availability Zones across different data centers to provide high availability and fault tolerance.
+
+if we put everything in one AZ and that AZ goes down then our application will also go down . to avoid this we put everything in multiple AZ for production environment.
+
+for development environment we can put everything in one AZ.
+
+```
+Region: us-east-1
+
+        AWS Region
+             │
+      ┌──────┴──────┐
+      │             │
+     AZ-a          AZ-b
+      │             │
+   Subnet A      Subnet B
+
+```
+
+# AWS Reserved Ip Addresses
+
+Reserved IP addresses is an IPv4 address or IPv6 address that is reserved for use with AWS services.
+
+https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses.html
+
+## Key Features:
+
+- it is a static public IP address that can be associated with an EC2 instance.
+- it is a virtual IP address that can be moved from one EC2 instance to another EC2 instance.
+- it is a regional resource.
+- it is a managed by AWS service.
+
+## Why we need it?
+
+We need it because when we stop and start EC2 instance its ip address will change. so we need a static public IP address that can be associated with an EC2 instance.
+
+```
+EC2 Instance (Web Server) - No public IP
+  └─ Elastic IP - Public IP for website access
+```
+
+## Example:
+
+For an IPv4 subnet a range of ip addresses is reserved for use by AWS services .
+
+First 4 ips and last 1 ip address is reserved for use by AWS services .
+
+example : if we create a subnet with range 10.0.1.0/24 then ip addresses from 10.0.1.0 to 10.0.1.3 and 10.0.1.255 are reserved for use by AWS services .
+
+AWS Reserved 5 ip addresses in subnet :
+
+1. .0 : Network Address
+2. .1 : Reserved for future use
+3. .2 : Reserved for Future Use (Used as the default gateway for the subnet)
+4. .3 : Reserved for Future Use
+5. .255 : Broadcast Address
+
+```
+256 total
+− 5 reserved
+= 251 usable
+```
+
+```
+10.0.1.0
+10.0.1.1
+10.0.1.2
+10.0.1.3
+10.0.1.255
+```
+
+# Terraform `cidrsubnet()` function (for creating multiple subnets) using advance terraform feature
+
+`cidrsubnet()` function is used to create a subnet from a given IP address range.
+
+```bash
+cidrsubnet(base, newbits, netnum)
+```
+
+Where:
+
+- **base** – The CIDR block to create a subnet from
+- **newbits** – The number of new bits to add to the prefix (creates the smaller subnet)
+- **netnum** – The subnet number to assign (0-based index)
+
+## Example:
+
+```bash
+cidrsubnet("10.0.0.0/16", 8, 1)
+
+# Result: 10.0.1.0/24
+```
+
+## means:
+
+```
+Original network:
+10.0.0.0/16
+
+Add:
+8 bits
+
+New:
+10.0.1.0/24
+
+Select:
+subnet number 1
+```
+
+## Example: how to create multiple subnets
+
+```bash
+cidrsubnet("192.168.0.0/16", 8, 0) # -> 192.168.0.0/24
+cidrsubnet("192.168.0.0/16", 8, 1) # -> 192.168.1.0/24
+cidrsubnet("192.168.0.0/16", 8, 2) # -> 192.168.2.0/24
+```
+
+### Why this matters for DevOps
+
+It allows them to programmatically create and manage complex IP address schemes without manual configuration.
+
+```bash
+
+# without cidrsubnet()
+
+public_subnet_a = "10.0.1.0/24"
+public_subnet_b = "10.0.2.0/24"
+private_subnet_a = "10.0.11.0/24"
+private_subnet_b = "10.0.12.0/24"
+
+```
+
+```bash
+
+# with cidrsubnet()
+# we can build dynamic subnet allocation.
+variable "vpc_cidr" {
+  type    = string
+  default = "10.0.0.0/16"
+}
+
+locals {
+  public_subnets = [
+    cidrsubnet(var.vpc_cidr, 8, 1),
+    cidrsubnet(var.vpc_cidr, 8, 2)
+  ]
+
+  private_subnets = [
+    cidrsubnet(var.vpc_cidr, 8, 11),
+    cidrsubnet(var.vpc_cidr, 8, 12)
+  ]
+}
+
+```
+
+### Example: Terraform output
+
+```
+                 VPC
+             10.0.0.0/16
+                  │
+       ┌──────────┴──────────┐
+       │                     │
+   Public Subnets        Private Subnets
+       │                     │
+   ┌───┴───┐             ┌───┴───┐
+   │       │             │       │
+  AZ-a    AZ-b          AZ-a    AZ-b
+   │       │             │       │
+  ALB     ALB           EC2     EC2
+                         │       │
+                         └──┬────┘
+                            │
+                         Database
+
+```
+
+# FUll Traffic Flow in VPC
+
+Suppose an EC2 instance in the public subnet wants to access
+
+**`https://google.com`**
+
+```bash
+EC2
+ │
+ │ destination = Internet
+ ▼
+Subnet Route Table
+ │
+ │ 0.0.0.0/0
+ ▼
+Internet Gateway
+ │
+ ▼
+Internet
+ │
+ ▼
+google.com
+```
+
+# Importance: Public IP Alone Doesn't Make a Subnet Public
+
+```
+
+                  ┌──────────────────────────────┐
+                  │                              │
+               Internet                       Internet
+                  │                              │
+                  ▼                              ▼
+         ┌────────────┐               ┌──────────────-─┐
+         │            │               │                │
+    No Route  ←→  Route Table  →→→  Route Table  →→→  Route Table
+   (No IGW/NAT)     (Private)       (Public)    (Direct Internet)
+      │               │                 |                 |
+      ▼               ▼                 ▼                 |
+ No Access    Internet Out  ←→    Inbound/Out  ←→  Inbound/Out
+      |               |                 |                 |
+      ▼               ▼                 ▼                 ▼
+   Private        Private            Public           Public
+   Subnet         Subnet             Subnet           Subnet
+
+```
+
+**_And the instance/network configuration must also allow the traffic_**
+
+# Production Architecture
+
+```
+
+                         Internet
+                            │
+                            ▼
+                    Internet Gateway
+                            │
+               ┌────────────┴────────────┐
+               │                         │
+         Public Subnet A           Public Subnet B
+         10.0.1.0/24               10.0.2.0/24
+               │                         │
+              ALB                       ALB
+               │                         │
+               └────────────┬────────────┘
+                            │
+                  ┌─────────┴─────────┐
+                  │                   │
+           Private Subnet A    Private Subnet B
+           10.0.11.0/24        10.0.12.0/24
+                  │                   │
+                 EC2                 EC2
+                  │                   │
+                  └─────────┬─────────┘
+                            │
+                         Database
+
+```
+
+## Terraform Dependency chain for VPC
+
+```
+VPC
+ │
+ ├─ Route Tables
+ ├─ Internet Gateway
+ ├─ NAT Gateways (if using private subnets)
+ ├─ Security Groups
+ ├─ Subnets
+ │
+ ├─ Launch Templates
+ │
+ ├─ EC2 Instances
+ │
+ ├─ ALB (Application Load Balancer)
+ │
+ ├─ Target Groups
+ │
+ ├─ RDS Databases (if using private subnets)
+ │
+ └─ Route53 Records
+
+```
+
+```
+#simple terraform code for creating VPC
+VPC
+ │
+ ├── Subnet
+ │
+ └── Internet Gateway
+       │
+       ▼
+   Route Table
+       │
+       ▼
+ Route Association
+
+```
+
+## why we need NAT
+
+```
+                         Internet
+                            │
+                            ▼
+                    Internet Gateway
+                            │
+               ┌────────────┴────────────┐
+               │                         │
+         Public Subnet A           Public Subnet B
+         10.0.1.0/24               10.0.2.0/24
+               │                         │
+              ALB                       ALB
+               │                         │
+               └────────────┬────────────┘
+                            │
+                  ┌─────────┴─────────┐
+                  │                   │
+           Private Subnet A    Private Subnet B
+           10.0.11.0/24        10.0.12.0/24
+                  │                   │
+                 EC2                 EC2
+                  │                   │
+           ┌──────┴──────┐     ┌──────┴──────┐
+           │             │     │             │
+    Database A    Database B    NAT Gateway   NAT Gateway
+
+```
+
+## Why NAT
+
+Private EC2 instances need internet access for software updates and external API calls.
+
+Without NAT, we cannot give private instances internet access.
+
+Private instances do not need public IP addresses.
+
+```
+Internet → Public Subnet → NAT → Private Subnet
+```
+
+## NAT vs Bastion
+
+```
+NAT → Enables private instances to access the Internet
+Bastion → Allows administrators to securely access private instances
+```
