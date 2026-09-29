@@ -7,6 +7,70 @@
 5. Output its ID and IP address
 */
 
+#Mental model 
+
+/*
+RESOURCE
+   │
+   │ "I want Terraform to manage this."
+   ▼
+Terraform
+   │
+   ├── CREATE
+   ├── UPDATE
+   └── DELETE
+
+
+DATA SOURCE
+   │
+   │ "I need information about this."
+   ▼
+Provider/API
+   │
+   └── READ
+*/
+
+# Architecture Diagram
+
+/*
+                 AWS
+                  │
+        ┌─────────┼──────────┐
+        │         │          │
+       VPC      Subnet       AMI
+        │         │          │
+        └─────────┼──────────┘
+                  │
+             Data Sources
+                  │
+                  ▼
+              Terraform
+                  │
+                  │ resource
+                  ▼
+              EC2 Instance
+
+*/
+
+# Very Important Production Pattern:
+
+/*
+                AWS Account
+                    │
+        ┌───────────┴───────────┐
+        │                       │
+ Existing Infrastructure     Terraform
+        │                       │
+        │                  creates new
+        │                  infrastructure
+        │                       │
+        ▼                       ▼
+   Data Sources              Resources
+*/
+
+
+# Terraform configuration
+
 resource "aws_instance" "nginx-web-server" {
   ami           = data.aws_ami.ubuntu-ami.id
   instance_type = "t3.micro"

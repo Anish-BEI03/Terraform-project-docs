@@ -45,6 +45,26 @@ data "aws_vpc" "main" {
     }
   }
 
+# Current Account information
+data "aws_caller_identity" "current" {}
+
+/*
+# Read another state file
+data "terraform_remote_state" "network" {
+  backend = "s3"
+  config = {
+    bucket = "my-terraform-state-bucket"
+    key    = "network/terraform.tfstate"
+    region = "us-east-1"
+  }
+}
+
+# Read a loacl file data
+data "local_file" "cfg"{
+ filename = "${path.module}/config.json"
+}
+*/
+
 output "ubuntu-ami-id" {
     value = data.aws_ami.ubuntu-ami.id
 }
@@ -56,4 +76,10 @@ output "public-subnet-id" {
 }
 output "public-sg-id" {
     value = data.aws_security_group.public-sg.id
+}
+output "account_id" {
+    value = data.aws_caller_identity.current.account_id
+}
+output "account_arn" {
+    value = data.aws_caller_identity.current.arn
 }

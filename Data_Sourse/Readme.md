@@ -497,6 +497,8 @@ data "aws_vpc" "main" {
 
 we can use depends_on to create dependency between data source and resource (only in rare cases when terraform can not detect the dependency automatically or value of resource is not available for data source)
 
+**Note :** Use depends_on only when there's a hidden dependency
+
 ```bash
 data "aws_vpc" "main" {
   depends_on = [resource.aws_vpc.main]
@@ -849,4 +851,86 @@ data "aws_vpc" "main" {
 output "vpc_id" {
   value = data.aws_vpc.main.id
 }
+```
+
+## Very Imporatant production Pattern
+
+```bash
+                AWS Account
+                    │
+        ┌───────────┴───────────┐
+        │                       │
+ Existing Infrastructure     Terraform
+        │                       │
+        │                  creates new
+        │                  infrastructure
+        │                       │
+        ▼                       ▼
+   Data Sources              Resources
+```
+
+For Example:
+
+```bash
+
+# Existing Infrastructure:
+Existing:
+VPC
+Subnets
+Route tables
+IAM roles
+Security groups
+
+        ↓ data sources
+
+Terraform
+
+        ↓ resources
+
+EKS
+EC2
+ALB
+Auto Scaling
+Applications
+```
+
+## Common Errors in data source
+
+1. object does not exist
+2. Multiple matches found
+3. Access denied
+4. Wrong region
+5. Wrong filter
+6. Wrong tag
+7. using a resource as a data source
+
+# Full devops-level diagram for production environment
+
+```
+                    AWS
+                     │
+       ┌─────────────┼─────────────┐
+       │             │             │
+      VPC          IAM           Route53
+       │
+   ┌───┴────┐
+   │        │
+ Subnets    SG
+   │
+   ▼
+ Data Sources
+   │
+   ├── VPC ID
+   ├── Subnet IDs
+   ├── AMI ID
+   ├── Account ID
+   ├── Region
+   └── IAM information
+          │
+          ▼
+       Terraform
+          │
+    ┌─────┼──────┐
+    ▼     ▼      ▼
+   EC2    ALB    ASG
 ```
